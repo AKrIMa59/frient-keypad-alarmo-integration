@@ -48,7 +48,6 @@ action:
       base_topic: !input mqtt_topic
       topic_set: "{{ base_topic }}/set"
       target_alarm: !input alarm_panel
-      notify_chan: !input notify_service  #à retirer
 
   - choose:
       # --- CAS 1 : SAISIE AU CLAVIER ---
