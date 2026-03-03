@@ -1,1 +1,129 @@
+blueprint:
+  name: "Blueprint Home Assistant Alarmo et Keypad Frient KEPZB-110 Zigbee2Mqtt"
+  description: "Blueprint pour utiliser un clavier Frient KEPZB-110 dans Home Assistant avec l'add-on Alarmo et Zigbee2Mqtt"
+  domain: automation
+  input:
+    mqtt_topic:
+      name: Topic MQTT Clavier
+      description: Le sujet de base du clavier (par exemple zigbee2mqtt/clavier)
+    alarm_panel:
+      name: Panneau Alarmo
+      selector:
+        entity:
+          domain: alarm_control_panel
 
+    # --- AZIONI CUSTOM ---
+    custom_code_1:
+      name: Code spécial 1
+      default: "0000"
+    target_action_1:
+      name: Action pour le code 1
+      selector:
+        action: {}
+    custom_code_2:
+      name: Code spécial 2
+      default: "1111"
+    target_action_2:
+      name: Action pour le code 2
+      selector:
+        action: {}
+    sos_action:
+      name: Action Bouton SOS
+      selector:
+        action: {}
+
+mode: restart
+
+trigger:
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    id: "keypad_input"
+  - trigger: state
+    entity_id: !input alarm_panel
+    id: "alarm_state_change"
+
+action:
+  - variables:
+      base_topic: !input mqtt_topic
+      topic_set: "{{ base_topic }}/set"
+      target_alarm: !input alarm_panel
+      notify_chan: !input notify_service  #à retirer
+
+  - choose:
+      # --- CAS 1 : SAISIE AU CLAVIER ---
+      - conditions:
+          - condition: trigger
+            id: "keypad_input"
+        sequence:
+          - variables:
+              payload: "{{ trigger.payload_json }}"
+              code: "{{ payload.action_code | string }}"
+              action_keypad: "{{ payload.action }}"
+              transaction_keypad: "{{ payload.action_transaction }}"
+              val_custom_1: !input custom_code_1
+              val_custom_2: !input custom_code_2
+
+          - choose:
+              # A. SOS
+              - conditions: "{{ action_keypad == 'emergency' }}"
+                sequence: !input sos_action
+
+              # B. code personnalise 1
+              - conditions: "{{ code | string == (val_custom_1 | string) }}"
+                sequence: !input target_action_1
+
+              # C. code personnalise 2
+              - conditions: "{{ code | string == (val_custom_2 | string) }}"
+                sequence: !input target_action_2
+
+              # D. commandes standard alarmo
+              - conditions: "{{ action_keypad in ['arm_all_zones', 'arm_day_zones', 'disarm'] }}"
+                sequence:
+                  - action: >-
+                      {% if action_keypad == 'arm_all_zones' %} alarm_control_panel.alarm_arm_away
+                      {% elif action_keypad == 'arm_day_zones' %} alarm_control_panel.alarm_arm_home
+                      {% else %} alarm_control_panel.alarm_disarm {% endif %}
+                    target:
+                      entity_id: !input alarm_panel
+                    data:
+                      code: "{{ code }}"
+
+                  - delay: { milliseconds: 600 }
+
+                  - if:
+                      - condition: template
+                        value_template: >
+                          {% set s = states(target_alarm) %}
+                          {{ (action_keypad == 'disarm' and s != 'disarmed') or (action_keypad != 'disarm' and s == 'disarmed') }}
+                    then:
+                      # Retour information clavier erreur de code
+                      - repeat:
+                          count: 3
+                          sequence:
+                            - action: mqtt.publish
+                              data:
+                                topic: "{{ topic_set }}"
+                                payload: '{"arm_mode": {"transaction": {{ transaction_keypad }}, "mode": "invalid_code"}}'
+                            - action: mqtt.publish
+                              data:
+                                topic: "{{ topic_set }}"
+                                payload: '{"warning": {"mode": "emergency", "level": "very_high", "strobe": false, "duration": 1}}'
+                            - delay: { milliseconds: 500 }
+
+      # --- CAS 2 : RETOUR D'INFORMATION SUR L'ÉTAT D'ALARME ---
+      - conditions:
+          - condition: trigger
+            id: "alarm_state_change"
+        sequence:
+          # RETOUR D'INFORMATION DU CLAVIER (LED)
+          - action: mqtt.publish
+            data:
+              topic: "{{ topic_set }}"
+              payload: >-
+                {% set stato = states(target_alarm) %}
+                {% if stato == 'pending' %} {"arm_mode": {"mode": "entry_delay"}}
+                {% elif stato == 'arming' %} {"arm_mode": {"mode": "exit_delay"}}
+                {% elif stato == 'disarmed' %} {"arm_mode": {"mode": "disarm"}}
+                {% elif stato in ['armed_away', 'armed_home', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
+                {% elif stato == 'triggered' %} {"warning": {"mode": "burglar", "duration": 180, "strobe": true}}
+                {% endif %}
