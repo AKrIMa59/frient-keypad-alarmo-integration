@@ -77,11 +77,16 @@ action:
                 sequence: !input target_action_2
 
               # D. commandes standard alarmo
-              - conditions: "{{ action_keypad in ['arm_all_zones', 'arm_day_zones', 'disarm'] }}"
+              # Mode Absence : arm_all_zones
+              # Mode Nuit : arm_night_zones
+              # Mode Vacances : arm_day_zones
+
+              - conditions: "{{ action_keypad in ['arm_all_zones', 'arm_day_zones', 'arm_night_zones', 'disarm'] }}"
                 sequence:
                   - action: >-
                       {% if action_keypad == 'arm_all_zones' %} alarm_control_panel.alarm_arm_away
-                      {% elif action_keypad == 'arm_day_zones' %} alarm_control_panel.alarm_arm_home
+                      {% elif action_keypad == 'arm_night_zones' %} alarm_control_panel.alarm_arm_night
+                      {% elif action_keypad == 'arm_day_zones' %} alarm_control_panel.alarm_arm_vacation
                       {% else %} alarm_control_panel.alarm_disarm {% endif %}
                     target:
                       entity_id: !input alarm_panel
@@ -120,10 +125,10 @@ action:
             data:
               topic: "{{ topic_set }}"
               payload: >-
-                {% set stato = states(target_alarm) %}
-                {% if stato == 'pending' %} {"arm_mode": {"mode": "entry_delay"}}
-                {% elif stato == 'arming' %} {"arm_mode": {"mode": "exit_delay"}}
-                {% elif stato == 'disarmed' %} {"arm_mode": {"mode": "disarm"}}
-                {% elif stato in ['armed_away', 'armed_home', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
-                {% elif stato == 'triggered' %} {"warning": {"mode": "burglar", "duration": 180, "strobe": true}}
+                {% set status_alarme = states(target_alarm) %}
+                {% if status_alarme == 'pending' %} {"arm_mode": {"mode": "entry_delay"}}
+                {% elif status_alarme == 'arming' %} {"arm_mode": {"mode": "exit_delay"}}
+                {% elif status_alarme == 'disarmed' %} {"arm_mode": {"mode": "disarm"}}
+                {% elif status_alarme in ['armed_away', 'arm_vacation', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
+                {% elif status_alarme == 'triggered' %} {"arm_mode": {"mode": "in_alarm"}}
                 {% endif %}
