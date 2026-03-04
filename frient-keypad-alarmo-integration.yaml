@@ -17,7 +17,10 @@ blueprint:
     max_attempts:
       name: Nombre maximum de tentatives de code
       default: 3
-
+      selector:
+        entity:
+          domain: input_number
+          
     # --- Action custom ---
     custom_code_1:
       name: Code spécial 1
