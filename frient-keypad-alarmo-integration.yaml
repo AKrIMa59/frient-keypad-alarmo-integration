@@ -67,7 +67,7 @@ action:
               transaction_keypad: "{{ payload.action_transaction }}"
               val_custom_1: !input custom_code_1
               val_custom_2: !input custom_code_2
-              max_attempts: !input max_attempts
+              val_max_attempts: !input max_attempts
 
           - choose:
               # A. SOS
@@ -127,7 +127,7 @@ action:
                             - delay: { milliseconds: 500 }
                       - if:
                           - condition: template
-                            value_template: "{{ states(max_attempts) | int >= 3 }}"
+                            value_template: "{{ states(val_max_attempts) | int >= 3 }}"
                         then:
                           # Action en cas de dépassement du nombre de tentatives déclenchée l'alarme alarmo
                           - action: mqtt.publish
