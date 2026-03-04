@@ -17,10 +17,7 @@ blueprint:
     max_attempts:
       name: Nombre maximum de tentatives de code
       default: 3
-      selector:
-        entity:
-          domain: input_number
-          
+
     # --- Action custom ---
     custom_code_1:
       name: Code spécial 1
@@ -70,6 +67,7 @@ action:
               transaction_keypad: "{{ payload.action_transaction }}"
               val_custom_1: !input custom_code_1
               val_custom_2: !input custom_code_2
+              max_attempts: !input max_attempts
 
           - choose:
               # A. SOS
