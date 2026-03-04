@@ -129,6 +129,6 @@ action:
                 {% if status_alarme == 'pending' %} {"arm_mode": {"mode": "entry_delay"}}
                 {% elif status_alarme == 'arming' %} {"arm_mode": {"mode": "exit_delay"}}
                 {% elif status_alarme == 'disarmed' %} {"arm_mode": {"mode": "disarm"}}
-                {% elif status_alarme in ['armed_away', 'arm_vacation', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
+                {% elif status_alarme in ['armed_away', 'armed_vacation', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
                 {% elif status_alarme == 'triggered' %} {"arm_mode": {"mode": "in_alarm"}}
                 {% endif %}
