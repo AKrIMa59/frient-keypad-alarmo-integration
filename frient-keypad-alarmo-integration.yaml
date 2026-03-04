@@ -12,11 +12,6 @@ blueprint:
       selector:
         entity:
           domain: alarm_control_panel
-    
-    # --- Compteur de tentatives de code ---
-    max_attempts:
-      name: Nombre maximum de tentatives de code
-      default: 3
 
     # --- Action custom ---
     custom_code_1:
@@ -67,7 +62,6 @@ action:
               transaction_keypad: "{{ payload.action_transaction }}"
               val_custom_1: !input custom_code_1
               val_custom_2: !input custom_code_2
-              val_max_attempts: !input max_attempts
 
           - choose:
               # A. SOS
@@ -107,11 +101,6 @@ action:
                           {% set s = states(target_alarm) %}
                           {{ (action_keypad == 'disarm' and s != 'disarmed') or (action_keypad != 'disarm' and s == 'disarmed') }}
                     then:
-                      # Incrementation du compteur de tentatives
-                      - action: input_number.increment
-                        target:
-                          entity_id: !input max_attempts
-
                       # Retour information clavier erreur de code
                       - repeat:
                           count: 3
@@ -125,26 +114,6 @@ action:
                                 topic: "{{ topic_set }}"
                                 payload: '{"warning": {"mode": "emergency", "level": "very_high", "strobe": false, "duration": 1}}'
                             - delay: { milliseconds: 500 }
-                      - if:
-                          - condition: template
-                            value_template: "{{ states(val_max_attempts) | int >= 3 }}"
-                        then:
-                          # Action en cas de dépassement du nombre de tentatives déclenchée l'alarme alarmo
-                          - action: mqtt.publish
-                            data:
-                              topic: "{{ topic_set }}"
-                              payload: '{"arm_mode": {"mode": "in_alarm"}}'
-
-                          - action: alarm_control_panel.alarm_trigger
-                            target:
-                              entity_id: !input alarm_panel
-
-                          # Réinitialisation du compteur de tentatives après l'alerte
-                          - action: input_number.set_value
-                            target:
-                              entity_id: !input max_attempts
-                            data:
-                              value: 0
 
       # --- CAS 2 : RETOUR D'INFORMATION SUR L'ÉTAT D'ALARME ---
       - conditions:
@@ -160,6 +129,6 @@ action:
                 {% if status_alarme == 'pending' %} {"arm_mode": {"mode": "entry_delay"}}
                 {% elif status_alarme == 'arming' %} {"arm_mode": {"mode": "exit_delay"}}
                 {% elif status_alarme == 'disarmed' %} {"arm_mode": {"mode": "disarm"}}
-                {% elif status_alarme in ['armed_away', 'arm_vacation', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
+                {% elif status_alarme in ['armed_away', 'armed_vacation', 'armed_night'] %} {"arm_mode": {"mode": "arm_all_zones"}}
                 {% elif status_alarme == 'triggered' %} {"arm_mode": {"mode": "in_alarm"}}
                 {% endif %}
